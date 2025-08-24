@@ -1,0 +1,276 @@
+---
+title: "Exploratory Data Analysis of IPL Data"
+author: "Arun Rao(Leader), Sumanth Goud Bairi, Abhigna Margam"
+output: 
+  html_document:
+    code_folding: hide
+    toc: true
+    date: "2022-11-11"
+---
+
+### Load Libraries and Data
+
+```{r}
+library(dplyr)
+library(ggplot2)
+```
+
+### Load Dataset
+
+```{r}
+matches <- read.csv("matches.csv")
+deliveries <- read.csv("deliveries.csv")
+```
+
+# Basic Data Inspection
+
+### Inspect Match Data
+
+```{r}
+head(matches)
+```
+
+```{r}
+str(matches)
+```
+
+```{r}
+summary(matches)
+```
+
+### Inspect Deliveries Data
+
+```{r}
+head(deliveries)
+```
+
+```{r}
+str(deliveries)
+```
+
+```{r}
+summary(deliveries)
+```
+
+# Data Cleaning
+
+### Check for Missing Values
+
+```{r}
+sum(is.na(matches))
+```
+
+```{r}
+sum(is.na(deliveries))
+```
+
+### Handle Missing Values
+
+```{r}
+matches <- na.omit(matches)
+```
+
+# Analysis
+
+### Distribution of Matches by Season
+
+```{r}
+matches_by_season <- matches %>%
+  group_by(season) %>%
+  summarise(Matches = length(unique(id)))
+```
+
+```{r}
+library(ggplot2)
+
+# Example data generation (replace with your actual data)
+matches_by_season <- data.frame(
+  season = factor(rep(2000:2010, each = 1)),
+  Matches = sample(10:100, 11)
+)
+
+# Plotting code
+ggplot(matches_by_season, aes(x = season, y = Matches, fill = season)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = rainbow(length(unique(matches_by_season$season)))) +
+  xlab("Season") +
+  ylab("Total matches") +
+  ggtitle("Total number of matches played in each season")
+
+
+```
+
+### Average Runs per Over
+
+```{r}
+runs_per_over <- deliveries %>%
+  group_by(over) %>%
+  filter(is_super_over == 0) %>%
+  summarise(Runs = mean(total_runs) * 6)
+
+```
+
+```{r}
+print(runs_per_over)
+
+```
+
+```{r}
+ggplot(runs_per_over, aes(over, Runs, fill = as.factor(over))) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = 1:20) +
+  guides(fill = FALSE) +
+  xlab("Over") + ylab("Total runs scored") +
+  ggtitle("Average number of runs scored in each over of the innings")
+
+```
+
+### Total Number of Wickets in Each Over
+
+```{r}
+wickets_per_over <- deliveries %>%
+  group_by(over) %>%
+  filter(is_super_over == 0) %>%
+  summarise(Wickets = sum(!is.na(player_dismissed)))
+
+```
+
+```{r}
+print(wickets_per_over)
+
+```
+
+```{r}
+ggplot(wickets_per_over, aes(over, Wickets, fill = as.factor(over))) +
+  geom_bar(stat = "identity") +
+  scale_x_continuous(breaks = 1:20) +
+  guides(fill = FALSE) +
+  xlab("Over") + ylab("Total wickets taken") +
+  ggtitle("Total number of wickets in each over of the innings")
+
+```
+
+### Batsmen with Top Strike Rate
+
+```{r}
+batsmen_strike_rate <- deliveries %>%
+  group_by(batsman) %>%
+  filter(n() > 500) %>%
+  summarise(strike_rate = mean(batsman_runs) / mean(ball) * 100)
+
+```
+
+```{r}
+top_batsmen_strike_rate <- batsmen_strike_rate %>%
+  arrange(desc(strike_rate)) %>%
+  top_n(10, wt = strike_rate)
+
+```
+
+```{r}
+print(top_batsmen_strike_rate)
+```
+
+```{r}
+ggplot(top_batsmen_strike_rate, aes(reorder(batsman, strike_rate), strike_rate, fill = batsman)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  guides(fill = FALSE) +
+  xlab("Batsman") + ylab("Strike Rate") +
+  ggtitle("Top 10 Batsmen by Strike Rate")
+
+```
+
+### Runs Scored vs Balls Faced
+
+```{r}
+selected_batsmen <- c("V Kohli", "SK Raina", "RG Sharma", "G Gambhir")
+```
+
+```{r}
+cumulative_runs <- deliveries %>%
+  filter(batsman %in% selected_batsmen) %>%
+  group_by(match_id, batsman) %>%
+  mutate(cum_run = cumsum(batsman_runs),
+         cum_ball = row_number())
+```
+
+```{r}
+cumulative_runs_filtered <- cumulative_runs %>%
+  filter(player_dismissed %in% selected_batsmen)
+```
+
+```{r}
+ggplot(cumulative_runs_filtered, aes(cum_ball, cum_run, color = batsman)) +
+  geom_point() +
+  xlab("Balls") + ylab("Runs") +
+  ggtitle("Runs scored vs balls faced in all the matches")
+```
+
+### Distribution of Runs in Powerplay (Overs 1-6)
+
+```{r}
+powerplay_runs <- deliveries %>%
+  filter(over >= 1 & over <= 6) %>%
+  group_by(match_id, inning) %>%
+  summarise(total_runs = sum(total_runs))
+```
+
+### 
+
+```{r}
+ggplot(powerplay_runs, aes(total_runs)) +
+  geom_histogram(binwidth = 10, fill = "blue", color = "black") +
+  xlab("Total Runs in Powerplay") + ylab("Frequency") +
+  ggtitle("Distribution of Runs in Powerplay (Overs 1-6)")
+
+```
+
+### Runs Distribution in Death Overs (Overs 16-20)
+
+```{r}
+death_overs_runs <- deliveries %>%
+  filter(over >= 16 & over <= 20) %>%
+  group_by(match_id, inning) %>%
+  summarise(total_runs = sum(total_runs))
+
+```
+
+### 
+
+```{r}
+ggplot(death_overs_runs, aes(total_runs)) +
+  geom_histogram(binwidth = 10, fill = "red", color = "black") +
+  xlab("Total Runs in Death Overs") + ylab("Frequency") +
+  ggtitle("Distribution of Runs in Death Overs (Overs 16-20)")
+
+```
+
+### Top Bowlers by Wickets
+
+```{r}
+top_bowlers_wickets <- deliveries %>%
+  group_by(bowler) %>%
+  summarise(total_wickets = sum(!is.na(player_dismissed))) %>%
+  arrange(desc(total_wickets)) %>%
+  top_n(10, wt = total_wickets)
+
+```
+
+### 
+
+```{r}
+print(top_bowlers_wickets)
+```
+
+### 
+
+```{r}
+ggplot(top_bowlers_wickets, aes(reorder(bowler, total_wickets), total_wickets, fill = bowler)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  guides(fill = FALSE) +
+  xlab("Bowler") + ylab("Total Wickets") +
+  ggtitle("Top 10 Bowlers by Wickets")
+
+```
